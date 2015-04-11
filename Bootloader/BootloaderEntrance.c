@@ -34,7 +34,7 @@
 #include "MicoPlatform.h"
 #include "platform.h"
 #include "platformInternal.h"
-#include "platform_common_config.h"
+#include "platform_config.h"
 
 #define boot_log(M, ...) custom_log("BOOT", M, ##__VA_ARGS__)
 #define boot_log_trace() custom_log_trace("BOOT")
@@ -42,7 +42,20 @@
 extern void Main_Menu(void);
 extern OSStatus update(void);
 
-const char menu[] =
+#ifdef SIZE_OPTIMIZE
+char menu[] =
+"\r\n"
+"MICO Bootloader for %s, HARDWARE_REVISION: %s\r\n"
+"0:BOOTUPDATE <-r>\r\n"
+"1:FWUPDATE <-r>\r\n"
+"2:DRIVERUPDATE <-r>\r\n"
+"3:PARAUPDATE <-r><-e>\r\n"
+"4:FLASHUPDATE  <-i><-s><-e><-r><-start><-end>\r\n"
+"5:MEMORYMAP\r\n"
+"6:BOOT\r\n"
+"7:REBOOT\r\n";
+#else
+char menu[] =
 "\r\n"
 "MICO Bootloader for %s, HARDWARE_REVISION: %s\r\n"
 "+ command -------------------------+ function ------------+\r\n"
@@ -62,6 +75,7 @@ const char menu[] =
 "  -start flash start address -end flash start address\r\n"
 " Example: Input \"4 -i -start 0x400 -end 0x800\": Update internal\r\n"
 "          flash from 0x400 to 0x800\r\n";
+#endif
 
 int main(void)
 {
@@ -69,16 +83,16 @@ int main(void)
   init_memory();
   init_architecture();
   init_platform_bootloader();
+
+  mico_set_bootload_ver();
   
 #ifdef MICO_FLASH_FOR_UPDATE
   update();
 #endif
   
-  /* BOOT_SEL = 1 => Normal start*/
   if(MicoShouldEnterBootloader() == false)
     startApplication();
-  /* BOOT_SEL = 0, MFG_SEL = 0 => Normal start, MICO will enter MFG mode when "MicoInit" is called*/
-  else if(MicoShouldEnterMFGMode()==true)
+  else if(MicoShouldEnterMFGMode() == true)
     startApplication();
 
   printf ( menu, MODEL, HARDWARE_REVISION );
@@ -87,4 +101,5 @@ int main(void)
     Main_Menu ();
   }
 }
+
 

@@ -50,9 +50,9 @@ typedef enum
  * typedef peripherals 
  * must be defined, MICO Driver need them. 
  **********************/
+#ifdef HAVE_GPIO
 typedef enum
 {
-#ifdef HAVE_GPIO
     MICO_GPIO_1 = MICO_COMMON_GPIO_MAX,
     MICO_GPIO_2,
     MICO_GPIO_3,
@@ -84,61 +84,61 @@ typedef enum
     MICO_GPIO_29,
     MICO_GPIO_30,
     MICO_GPIO_MAX, /* Denotes the total number of GPIO port aliases. Not a valid GPIO alias */
-#endif 
 } mico_gpio_t;
+#endif 
 
+#ifdef HAVE_SPI
 typedef enum
 {
-#ifdef HAVE_SPI
     MICO_SPI_1,
     MICO_SPI_MAX, /* Denotes the total number of SPI port aliases. Not a valid SPI alias */
-#endif 
 } mico_spi_t;
+#endif 
 
+#ifdef HAVE_I2C
 typedef enum
 {
-#ifdef HAVE_I2C
     MICO_I2C_1,
     MICO_I2C_MAX, /* Denotes the total number of I2C port aliases. Not a valid I2C alias */
-#endif 
 } mico_i2c_t;
+#endif 
 
+#ifdef HAVE_PWM
 typedef enum
 {
-#ifdef HAVE_PWM
     MICO_PWM_1 = MICO_COMMON_PWM_MAX,
     MICO_PWM_2,
     MICO_PWM_3,
     MICO_PWM_MAX, /* Denotes the total number of PWM port aliases. Not a valid PWM alias */
-#endif 
 } mico_pwm_t;
+#endif 
 
+#ifdef HAVE_ADC
 typedef enum
 {
-#ifdef HAVE_ADC
     MICO_ADC_1,
     MICO_ADC_2,
     MICO_ADC_3,
     MICO_ADC_MAX, /* Denotes the total number of ADC port aliases. Not a valid ADC alias */
-#endif 
 } mico_adc_t;
+#endif 
 
+#ifdef HAVE_UART
 typedef enum
 {
-#ifdef HAVE_UART
     MICO_UART_1,
     MICO_UART_2,
     MICO_UART_MAX, /* Denotes the total number of UART port aliases. Not a valid UART alias */
-#endif 
 } mico_uart_t;
+#endif 
 
+#ifdef HAVE_FLASH
 typedef enum
 {
-#ifdef HAVE_FLASH
   MICO_SPI_FLASH,
   MICO_INTERNAL_FLASH,
-#endif 
 } mico_flash_t;
+#endif 
 
 /******************************************************
  *                      Macros
@@ -169,6 +169,9 @@ typedef enum
 #define NUMBER_OF_UART_INTERFACES  MICO_UART_MAX //2
 
 #define STDIO_UART       MICO_UART_1
+#define UART_FOR_APP       MICO_UART_1
+#define CLI_UART       MICO_UART_2
+#define MFG_TEST       MICO_UART_1
 
 /**============== Memory map================== */
 #define INTERNAL_FLASH_START_ADDRESS    (uint32_t)0x08000000

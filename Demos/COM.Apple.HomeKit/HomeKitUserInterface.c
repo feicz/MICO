@@ -252,9 +252,6 @@ void HKWriteCharacteristicValue(int accessoryID, int serviceID, int characterist
 
     if(inContext->appStatus.service.on_status == kHKBusyErr){
       inContext->appStatus.service.on = inContext->appStatus.service.on_new;
-	  #ifdef FRDM_K64F
-      MicoSysLed(inContext->appStatus.service.on_new);
-	  #endif 
       inContext->appStatus.service.on_status = kNoErr;      
     }
 
@@ -337,4 +334,9 @@ void HKCharacteristicInit(mico_Context_t * const inContext)
   inContext->appStatus.service.cooling_threshold                = 28;
   strncpy(inContext->appStatus.service.name,                    "Wiliam's thermostat", 64);
 #endif
+}
+
+int verify_otp(void)
+{
+  return 1;
 }

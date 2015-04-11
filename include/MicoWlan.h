@@ -34,6 +34,10 @@
 
 #include "Common.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define micoWlanStart             StartNetwork
 #define micoWlanStartAdv          StartAdvNetwork
 #define micoWlanGetIPStatus       getNetPara
@@ -441,6 +445,29 @@ OSStatus micoWlanStartWPS(int inTimeout);
  */
 OSStatus micoWlanStopWPS(void);
 
+
+/** @brief  Start wechat airkiss configuration procedure
+ *
+ *  @detail This function can read SSID, password and extra user data sent from
+ *          Easylink APP.  
+ *          MICO sends a callback: mico_notify_EASYLINK_WPS_COMPLETED
+ *          with function:
+ *          void (*function)(network_InitTypeDef_st *nwkpara, mico_Context_t * const inContext);
+ *          that provide SSID and password, nwkpara is NULL if timeout or get an error
+ *
+ *  @param  inTimeout: If airkiss is excuted longer than this parameter in backgound.
+ *          MICO stops airkiss and sends a callback where nwkpara is NULL
+ *
+ *  @retval kNoErr.
+ */
+OSStatus micoWlanStartAirkiss(int inTimeout);
+
+/** @brief  Stop wechat airkiss configuration procedure
+ *  
+ *  @retval kNoErr.
+ */
+OSStatus micoWlanStopAirkiss(void);
+
 /** @brief  Enable IEEE power save mode
  * 
  *  @detail When this function is enabled, MICO enter IEEE power save mode if
@@ -466,6 +493,9 @@ void wifimgr_debug_enable(bool enable);
 /**
   * @}
   */
+#ifdef __cplusplus
+    }
+#endif
 
 #endif //__MICOWLAN_H__
 

@@ -24,24 +24,26 @@
 #ifndef __MICOAPPDEFINE_H
 #define __MICOAPPDEFINE_H
 
+#include "MICO.h"
 #include "Common.h"
 
 #define APP_INFO   "mxchipWNet SPP Demo based on MICO OS"
 
-#define FIRMWARE_REVISION   "MICO_SPP_2_2"
+#define FIRMWARE_REVISION   "MICO_SPP_2_4"
 #define MANUFACTURER        "MXCHIP Inc."
 #define SERIAL_NUMBER       "20140606"
 #define PROTOCOL            "com.mxchip.spp"
 
 /* Wi-Fi configuration mode */
-#if defined(FRDM_K64F)||defined(LPCXPRESSO54102)
-#define MICO_CONFIG_MODE CONFIG_MODE_EASYLINK //Jer test freescale
-#else
 #define MICO_CONFIG_MODE CONFIG_MODE_EASYLINK_WITH_SOFTAP
-#endif
+
+/* Demo C function call C++ function and C++ function call C function */
+//#define MICO_C_CPP_MIXING_DEMO
+
 /*User provided configurations*/
 #define CONFIGURATION_VERSION               0x00000002 // if default configuration is changed, update this number
-#define MAX_Local_Client_Num                8
+#define MAX_QUEUE_NUM                       6  // 1 remote client, 5 local server
+#define MAX_QUEUE_LENGTH                    8  // each queue max 8 msg
 #define LOCAL_PORT                          8080
 #define DEAFULT_REMOTE_SERVER               "192.168.2.254"
 #define DEFAULT_REMOTE_SERVER_PORT          8080
@@ -49,7 +51,6 @@
 #define UART_ONE_PACKAGE_LENGTH             1024
 #define wlanBufferLen                       1024
 #define UART_BUFFER_LENGTH                  2048
-#define UART_FOR_APP                        MICO_UART_1
 
 #define LOCAL_TCP_SERVER_LOOPBACK_PORT      1000
 #define REMOTE_TCP_CLIENT_LOOPBACK_PORT     1002
@@ -86,20 +87,23 @@ typedef struct
   uint32_t          USART_BaudRate;
 } application_config_t;
 
+typedef struct _socket_msg {
+  int ref;
+  int len;
+  uint8_t data[1];
+} socket_msg_t;
+
 /*Running status*/
 typedef struct _current_app_status_t {
   /*Local clients port list*/
-  uint32_t          loopBack_PortList[MAX_Local_Client_Num];
-  /*Remote TCP client connecte*/
-  bool              isRemoteConnected;
+  mico_queue_t*  socket_out_queue[MAX_QUEUE_NUM];
+  mico_mutex_t   queue_mtx;
 } current_app_status_t;
 
 
 void localTcpServer_thread(void *inContext);
 void remoteTcpClient_thread(void *inContext);
 void uartRecv_thread(void *inContext);
-
-
 
 #endif
 

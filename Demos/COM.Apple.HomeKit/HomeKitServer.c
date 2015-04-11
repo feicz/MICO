@@ -161,7 +161,7 @@ void homeKitListener_thread(void *inContext)
         inet_ntoa(ip_address, addr.s_ip );
         ha_log("HomeKit Client %s:%d connected, fd: %d", ip_address, addr.s_port, j);
         ha_log("memory>>>>>>>>: %d", mico_memory_info()->free_memory);
-        err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "HomeKit Client", homeKitClient_thread, 0xC00, &j);  
+        err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "HomeKit Client", homeKitClient_thread, 0x1000, &j);  
         if(err != kNoErr){
           ha_log("HomeKit Client for fd %d create failed", j);
           SocketClose(&j);

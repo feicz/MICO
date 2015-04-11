@@ -39,17 +39,20 @@
 #include "JSON-C/json.h"
 #include "MICOAppDefine.h"
 
-#define CONFIG_MODE_EASYLINK                    2
-#define CONFIG_MODE_SOFT_AP                     3
-#define CONFIG_MODE_EASYLINK_WITH_SOFTAP        4
-#define CONFIG_MODE_WPS                         5
-#define CONFIG_MODE_WPS_WITH_SOFTAP             6
-#define CONFIG_MODE_WAC                         7
-#define CONFIG_MODE_AIRKISS                     8
+#define CONFIG_MODE_EASYLINK                    (2)
+#define CONFIG_MODE_SOFT_AP                     (3)
+#define CONFIG_MODE_EASYLINK_WITH_SOFTAP        (4)
+#define CONFIG_MODE_WPS                         (5)
+#define CONFIG_MODE_WPS_WITH_SOFTAP             (6)
+#define CONFIG_MODE_WAC                         (7)
+#define CONFIG_MODE_AIRKISS                     (8)
 
-#define EASYLINK_BYPASS_NO                      0
-#define EASYLINK_BYPASS                         1
-#define EASYLINK_SOFT_AP_BYPASS                 2
+#define EASYLINK_BYPASS_NO                      (0)
+#define EASYLINK_BYPASS                         (1)
+#define EASYLINK_SOFT_AP_BYPASS                 (2)
+
+#define MICO_CLI_ENABLE
+//#define MFG_MODE_AUTO /**< Device enter MFG mode if MICO settings are erased. */
 
 /* Define MICO service thread stack size */
 #ifdef DEBUG
@@ -86,7 +89,10 @@ typedef enum  {
   wLanUnConfigured,
   /*Normal working mode, module use the configured settings to connecte to wlan, and run 
     user's threads*/
-  allConfigured
+  allConfigured,
+  /*If MFG_MODE_AUTO is enabled and MICO settings are erased (maybe a fresh device just has 
+    been programed or MICO settings is damaged), module will enter MFG mode when powered on. */
+  mfgConfigured
 }Config_State_t;
 
 typedef enum
@@ -191,5 +197,11 @@ OSStatus MICOStartApplication           ( mico_Context_t * const inContext );
 OSStatus MICORestoreDefault             ( mico_Context_t * const inContext );
 OSStatus MICOReadConfiguration          ( mico_Context_t * const inContext );
 OSStatus MICOUpdateConfiguration        ( mico_Context_t * const inContext );
+#ifdef MFG_MODE_AUTO
+OSStatus MICORestoreMFG                 ( mico_Context_t * const inContext );
+#endif
+
+
+void mico_mfg_test( mico_Context_t * const inContext );
 
 #endif /* __MICO_DEFINE_H */

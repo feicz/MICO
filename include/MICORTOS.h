@@ -35,7 +35,13 @@
 #include "Common.h"
 
 #define mico_thread_sleep                 sleep
+
+#ifdef NO_MICO_RTOS
+#define mico_thread_msleep                mico_thread_msleep_no_os
+#else
 #define mico_thread_msleep                msleep
+#endif
+
 #define mico_rtos_suspend_all_thread      vTaskSuspendAll
 #define mico_rtos_resume_all_thread       xTaskResumeAll
 
@@ -56,6 +62,8 @@ typedef void* mico_semaphore_t;
 typedef void* mico_mutex_t;
 typedef void* mico_thread_t;
 typedef void* mico_queue_t;
+typedef void* mico_event;// MICO OS event: mico_semaphore_t, mico_mutex_t or mico_queue_t
+
 typedef void (*timer_handler_t)( void* arg );
 
 typedef struct
@@ -191,7 +199,7 @@ bool mico_rtos_is_current_thread( mico_thread_t* thread );
   *
   * @return   None.
   */
-void mico_thread_sleep(int seconds);
+void mico_thread_sleep(uint32_t seconds);
 
 /** @brief    Suspend current thread for a specific time
  *
@@ -199,15 +207,8 @@ void mico_thread_sleep(int seconds);
  *
  * @return    None.
  */
-void mico_thread_msleep(int milliseconds);
+void mico_thread_msleep(uint32_t milliseconds);
 
-/** @brief    Inserts a delay time in no os.
- *
- * @param     timer : A time interval (Unit: millisecond)
- *
- * @return    None.
- */
-void mico_thread_msleep_no_os(volatile uint32_t  milliseconds);
 
 /**
   * @}
@@ -418,7 +419,7 @@ OSStatus mico_rtos_is_queue_full( mico_queue_t* queue );
   *
   * @returns  Time in milliseconds since RTOS started.
   */
-uint32_t mico_get_time(void);
+WEAK uint32_t mico_get_time(void);
 
 /**
   * @brief    Gets time in miiliseconds in no OS mode ( Used in bootloader )
@@ -443,7 +444,7 @@ uint32_t mico_get_time_no_os(void);
   * @return    kNoErr        : on success.
   * @return    kGeneralErr   : if an error occurred
   */
-OSStatus mico_init_timer( mico_timer_t* timer, uint32_t time_ms, timer_handler_t function, void* arg );
+WEAK OSStatus mico_init_timer( mico_timer_t* timer, uint32_t time_ms, timer_handler_t function, void* arg );
 
 
 /** @brief    Starts a RTOS timer running
@@ -455,7 +456,7 @@ OSStatus mico_init_timer( mico_timer_t* timer, uint32_t time_ms, timer_handler_t
   * @return   kNoErr        : on success.
   * @return   kGeneralErr   : if an error occurred
   */
-OSStatus mico_start_timer( mico_timer_t* timer );
+WEAK OSStatus mico_start_timer( mico_timer_t* timer );
 
 
 /** @brief    Stops a running RTOS timer
@@ -467,7 +468,7 @@ OSStatus mico_start_timer( mico_timer_t* timer );
   * @return   kNoErr        : on success.
   * @return   kGeneralErr   : if an error occurred
   */
-OSStatus mico_stop_timer( mico_timer_t* timer );
+WEAK OSStatus mico_stop_timer( mico_timer_t* timer );
 
 
 /** @brief    Reloads a RTOS timer that has expired
@@ -503,6 +504,9 @@ OSStatus mico_deinit_timer( mico_timer_t* timer );
   * @return   false       : if not running
   */
 bool mico_is_timer_running( mico_timer_t* timer );
+
+int mico_create_event_fd(mico_event handle);
+int mico_delete_event_fd(int fd);
 
 /**
   * @}

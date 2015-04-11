@@ -1,4 +1,5 @@
 Document/html/*
+Projects/uvProjecs/*
 Build/*
 *.dep
 *.jlink
@@ -10,3 +11,6 @@ Build/*
 *.zip
 *.tmp
 si/*
+*.wspos
+*.William
+.svn

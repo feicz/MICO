@@ -34,7 +34,8 @@
 #ifndef __MICONOTIFICATIONCENTER_H__
 #define __MICONOTIFICATIONCENTER_H__
 
-#include "MICODefine.h"
+//#include "MICODefine.h"
+#include "Common.h"
 
 typedef enum {
   NOTIFY_STATION_UP = 1,
@@ -72,7 +73,7 @@ OSStatus MICOAddNotification          ( mico_notify_types_t notify_type, void *f
 OSStatus MICORemoveNotification       ( mico_notify_types_t notify_type, void *functionAddress );
 
 void sendNotifySYSWillPowerOff(void);
-
+void system_version(char *str, int len);
 
 
 

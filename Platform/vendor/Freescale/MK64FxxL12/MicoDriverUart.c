@@ -32,25 +32,25 @@
 
 #include "MICORTOS.h"
 #include "MICOPlatform.h"
-
-#include "platform.h"
-#include "platform_common_config.h"
-#include "fsl_device_registers.h"
+#include <string.h>
 #include "fsl_uart_driver.h"
+#include "fsl_uart_common.h"
 #include "fsl_edma_driver.h"
 #include "fsl_uart_edma_driver.h"
 #include "fsl_clock_manager.h"
+#include "fsl_interrupt_manager.h"
+
 #include "board.h"
-
-#include "gpio_irq.h"
-
-#include "string.h"
 #include "PlatformLogging.h"
 /******************************************************
 *                    Constants
 ******************************************************/
 
 
+const uint32_t uartInstance[] ={
+    [MICO_UART_1] = BOARD_DEBUG_UART_INSTANCE,
+    [MICO_UART_2] = BOARD_APP_UART_INSTANCE,
+};
 /******************************************************
 *                   Enumerations
 ******************************************************/
@@ -58,14 +58,11 @@
 /******************************************************
 *                 Type Definitions
 ******************************************************/
-#define ADD_OS_CODE 0 //1 //test #macro
-#define USE_DMA_UART
-/* Ring buffer size */
-#define UART_RB_SIZE 128
+#define RING_BUFF_ON 0
+
+#define UART_IRQ_APP 
 
 
-/* Transmit and receive buffers */
-static uint8_t rxbuff[UART_RB_SIZE], txbuff[UART_RB_SIZE];
 
 /******************************************************
 *                    Structures
@@ -78,6 +75,7 @@ typedef struct
 #ifndef NO_MICO_RTOS
   mico_semaphore_t    rx_complete;
   mico_semaphore_t    tx_complete;
+  mico_mutex_t        tx_mutex;
 #else
   volatile bool       rx_complete;
   volatile bool       tx_complete;
@@ -94,11 +92,16 @@ typedef struct
 static uart_interface_t uart_interfaces[NUMBER_OF_UART_INTERFACES];
 
 
+
+#ifdef UART_IRQ_APP
+static uart_user_config_t uartConfig;
+static uart_state_t uartState;
+#else
 static edma_state_t state_app; 
 static edma_user_config_t userConfig_app; 
 static uart_edma_state_t uartStateEdma_app;    
 static uart_edma_user_config_t uartConfig_app;
-
+#endif
 
 #ifndef NO_MICO_RTOS
 static mico_uart_t current_uart;
@@ -122,6 +125,20 @@ static void RX_PIN_WAKEUP_handler(void *arg);
 /******************************************************
 *               Function Definitions
 ******************************************************/
+uint32_t getInstanceBy(mico_uart_t uart){
+    return uartInstance[uart];
+}
+
+mico_uart_t getUartBy(uint32_t instance){
+    switch(instance){
+        case BOARD_DEBUG_UART_INSTANCE:
+            return  MICO_UART_1;
+        case BOARD_APP_UART_INSTANCE:
+            return  MICO_UART_2;
+        default:
+            return MICO_UART_1;
+    }
+}
 
 OSStatus MicoUartInitialize( mico_uart_t uart, const mico_uart_config_t* config, ring_buffer_t* optional_rx_buffer )
 {
@@ -138,14 +155,7 @@ OSStatus MicoStdioUartInitialize( const mico_uart_config_t* config, ring_buffer_
 
 OSStatus internal_uart_init( mico_uart_t uart, const mico_uart_config_t* config, ring_buffer_t* optional_rx_buffer )
 {
-    // uart_state_t uartState;
-    /*edma_state_t state; 
-    edma_user_config_t userConfig; 
-    uart_edma_state_t uartStateEdma;    
-    uart_edma_user_config_t uartConfig;*/
-    uint32_t i;
-         platform_log("internal uart init.");
-#if ADD_OS_CODE
+    uint32_t Instance; //fsl only
 #ifndef NO_MICO_RTOS
   mico_rtos_init_semaphore(&uart_interfaces[uart].tx_complete, 1);
   mico_rtos_init_semaphore(&uart_interfaces[uart].rx_complete, 1);
@@ -153,11 +163,10 @@ OSStatus internal_uart_init( mico_uart_t uart, const mico_uart_config_t* config,
   uart_interfaces[uart].tx_complete = false;
   uart_interfaces[uart].rx_complete = false;
 #endif  
-#endif 
-  MicoMcuPowerSaveConfig(false);  
+  MicoMcuPowerSaveConfig(false); 
+    Instance = getInstanceBy(uart);
     /* Configure the UART TX/RX pins */
-    configure_uart_pins(BOARD_APP_UART_INSTANCE);
-#if ADD_OS_CODE
+    configure_uart_pins(Instance); //BOARD_APP_UART_INSTANCE);
 #ifndef NO_MICO_RTOS
   if(config->flags & UART_WAKEUP_ENABLE){
     current_uart = uart;
@@ -165,9 +174,16 @@ OSStatus internal_uart_init( mico_uart_t uart, const mico_uart_config_t* config,
     mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "UART_WAKEUP", thread_wakeup, 0x100, &current_uart);
   }
 #endif 
-#endif 
-#if defined(USE_DMA_UART)
 	//OSA_Init();
+#ifdef UART_IRQ_APP    
+    /****************************************************************/
+    uartConfig.baudRate = 115200;
+    uartConfig.bitCountPerChar = kUart8BitsPerChar;
+    uartConfig.parityMode = kUartParityDisabled;
+    uartConfig.stopBitCount = kUartOneStopBit;
+    /***************************************************************/
+    UART_DRV_Init(Instance, &uartState, &uartConfig);
+#else
     userConfig_app.chnArbitration = kEDMAChnArbitrationRoundrobin;
     userConfig_app.notHaltOnError = false;
 
@@ -177,11 +193,9 @@ OSStatus internal_uart_init( mico_uart_t uart, const mico_uart_config_t* config,
     uartConfig_app.baudRate = 115200;
 
     EDMA_DRV_Init(&state_app, &userConfig_app);    
-    UART_DRV_EdmaInit(BOARD_APP_UART_INSTANCE, &uartStateEdma_app, &uartConfig_app); 
-   //  DMA0_IRQHandler();//test
-    //uint8_t buff[] = "\n\r++++++++++++++ UART-DMA Test Start ++++++++++++++++++\n\r";//test
-   //  uint32_t byteCountBRchange = sizeof(buff); //test
-   //  UART_DRV_EdmaSendDataBlocking(BOARD_DEBUG_UART_INSTANCE, buff, byteCountBRchange, 2000); //test
+    UART_DRV_EdmaInit(Instance, &uartStateEdma_app, &uartConfig_app); 
+#endif
+#if RING_BUFF_ON 
   if (optional_rx_buffer != NULL)
   {
      //  Note that the ring_buffer should've been initialised first
@@ -190,68 +204,146 @@ OSStatus internal_uart_init( mico_uart_t uart, const mico_uart_config_t* config,
     platform_uart_receive_bytes( uart, optional_rx_buffer->buffer, optional_rx_buffer->size, 0 );
   }  
 #endif
-
   MicoMcuPowerSaveConfig(true);  
   return kNoErr;
 }
 
 OSStatus MicoUartFinalize( mico_uart_t uart )
 {
-  
-    UART_DRV_EdmaDeinit(BOARD_APP_UART_INSTANCE);    
-    EDMA_DRV_Deinit();    
-#if ADD_OS_CODE
+    uint32_t  Instance = getInstanceBy(uart);
+    // uart = MICO_UART_1; //test
+#ifdef  UART_IRQ_APP 
+    UART_DRV_Deinit(Instance);
+#else     
+    UART_DRV_EdmaDeinit(Instance);    
+    EDMA_DRV_Deinit();   
+    INT_SYS_DisableIRQ(g_uartRxTxIrqId[Instance]);
+#endif
 #ifndef NO_MICO_RTOS
   mico_rtos_deinit_semaphore(&uart_interfaces[uart].rx_complete);
   mico_rtos_deinit_semaphore(&uart_interfaces[uart].tx_complete);
-#endif  
 #endif  
   
   return kNoErr;
 }
 
+void UART_DRV_CompleteSendData(uint32_t instance)
+{
+   // assert(instance < HW_UART_UART_APP_INDEX_COUNT);
+    mico_uart_t uart = getUartBy(instance);
+
+    uint32_t baseAddr = g_uartBaseAddr[instance];
+    uart_state_t * uartState = (uart_state_t *)g_uartStatePtr[instance];
+    /* Disable the transmitter data register empty interrupt */
+    UART_HAL_SetTxDataRegEmptyIntCmd(baseAddr, false);
+
+    /* Signal the synchronous completion object. */
+    if (uartState->isTxBlocking)
+    {
+        OSA_SemaPost(&uartState->txIrqSync);
+        mico_rtos_set_semaphore(&uart_interfaces[uart].tx_complete);
+    }
+
+    /* Update the information of the module driver state */
+    uartState->isTxBusy = false; 
+}
+
 OSStatus MicoUartSend( mico_uart_t uart, const void* data, uint32_t size )
 {
 //  /* Reset DMA transmission result. The result is assigned in interrupt handler */
-//   uart_interfaces[uart].tx_dma_result = kGeneralErr;
-         platform_log("==== uart send.");
-//  
+    uint32_t  Instance = getInstanceBy(uart);
+   uart_interfaces[uart].tx_dma_result = kGeneralErr;
+#ifndef NO_MICO_RTOS
+  mico_rtos_lock_mutex(&uart_interfaces[uart].tx_mutex);
+#endif  
   MicoMcuPowerSaveConfig(false);  
-  if (UART_DRV_EdmaSendData(BOARD_APP_UART_INSTANCE, data, size) == kStatus_UART_Success){
-#if ADD_OS_CODE
+#ifdef  UART_IRQ_APP
+  if (UART_DRV_SendData(Instance, data, size) == kStatus_UART_Success){
+#else 
+  if (UART_DRV_EdmaSendData(Instance, data, size) == kStatus_UART_Success){
+#endif
+    
         #ifndef NO_MICO_RTOS
             mico_rtos_set_semaphore( &uart_interfaces[ uart ].tx_complete );
         #else
             uart_interfaces[ uart ].rx_complete = true;
         #endif
-#endif
-  }
-//  
-//  uart_mapping[uart].tx_dma_stream->CR  &= ~(uint32_t) DMA_SxCR_CIRC;
-//  uart_mapping[uart].tx_dma_stream->NDTR = size;
-//  uart_mapping[uart].tx_dma_stream->M0AR = (uint32_t)data;
-//  
-//  USART_DMACmd( uart_mapping[uart].usart, USART_DMAReq_Tx, ENABLE );
-//  USART_ClearFlag( uart_mapping[uart].usart, USART_FLAG_TC );
-//  DMA_Cmd( uart_mapping[uart].tx_dma_stream, ENABLE );
-//  
-#if ADD_OS_CODE
+  }  
 #ifndef NO_MICO_RTOS
   mico_rtos_get_semaphore( &uart_interfaces[ uart ].tx_complete, MICO_NEVER_TIMEOUT );
 #else 
   while(uart_interfaces[ uart ].tx_complete == false);
   uart_interfaces[ uart ].tx_complete = false;
 #endif
-#endif
 //  return uart_interfaces[uart].tx_dma_result; 
   MicoMcuPowerSaveConfig(true);
+#ifndef NO_MICO_RTOS
+  mico_rtos_unlock_mutex(&uart_interfaces[uart].tx_mutex);
+#endif
 
   return kNoErr;
 }
 
+void UART_DRV_CompleteReceiveData(uint32_t instance)
+{
+    assert(instance < HW_UART_INSTANCE_COUNT);
+    uart_state_t * uartState = (uart_state_t *)g_uartStatePtr[instance];
+    uint32_t baseAddr = g_uartBaseAddr[instance];
+    mico_uart_t uart = getUartBy(instance);
+    
+    /* Disable receive data full interrupt */
+    UART_HAL_SetRxDataRegFullIntCmd(baseAddr, false);
+
+    /* Signal the synchronous completion object. */
+    if (uartState->isRxBlocking)
+    {
+        mico_rtos_set_semaphore(&uart_interfaces[uart].rx_complete); //OSA_SemaPost(&uartState->rxIrqSync);
+    }
+
+    /* Update the information of the module driver state */
+    uartState->isRxBusy = false;
+}
+
+uart_status_t UART_DRV_ReceiveDataBlocking(uint32_t instance, uint8_t * rxBuff,
+                                           uint32_t rxSize, uint32_t timeout)
+{
+    assert(rxBuff);
+    assert(instance < HW_UART_INSTANCE_COUNT);
+    
+    mico_uart_t uart = getUartBy(instance);
+    uart_state_t * uartState = (uart_state_t *)g_uartStatePtr[instance];
+    uart_status_t error = kStatus_UART_Success;
+    uint32_t baseAddr = g_uartBaseAddr[instance];
+    OSStatus Status;
+    
+    /* Indicates current transaction is blocking.*/
+    uartState->isRxBlocking = true;
+
+    if (uartState->isRxBusy)
+    {
+        return kStatus_UART_RxBusy;
+    }
+    uartState->rxBuff = rxBuff;
+    uartState->rxSize = rxSize;
+    uartState->isRxBusy = true;
+    /* enable the receive data full interrupt */
+    UART_HAL_SetRxDataRegFullIntCmd(baseAddr, true);
+
+    /* Wait until all the data is received or for timeout.*/
+    Status = mico_rtos_get_semaphore( &uart_interfaces[uart].rx_complete, timeout );
+
+    if (Status != kNoErr)
+    {
+        /* Abort the transfer so it doesn't continue unexpectedly.*/
+        UART_DRV_AbortReceivingData(instance);
+        error = kStatus_UART_Timeout; // kGeneralErr;
+    }
+    return error;
+}
+
 OSStatus MicoUartRecv( mico_uart_t uart, void* data, uint32_t size, uint32_t timeout )
 {
-#if 0 
+#if RING_BUFF_ON
   if (uart_interfaces[uart].rx_buffer != NULL)
   {
     while (size != 0)
@@ -263,11 +355,9 @@ OSStatus MicoUartRecv( mico_uart_t uart, void* data, uint32_t size, uint32_t tim
       {
         /* Set rx_size and wait in rx_complete semaphore until data reaches rx_size or timeout occurs */
         uart_interfaces[uart].rx_size = transfer_size;
-#if ADD_OS_CODE
 #ifndef NO_MICO_RTOS
         if ( mico_rtos_get_semaphore( &uart_interfaces[uart].rx_complete, timeout) != kNoErr )
         {
-         platform_log("uart receive 01"); 
           uart_interfaces[uart].rx_size = 0;
           return kTimeoutErr;
         }
@@ -281,8 +371,6 @@ OSStatus MicoUartRecv( mico_uart_t uart, void* data, uint32_t size, uint32_t tim
           }
         }
 #endif
-#endif
-         platform_log("uart receive 02"); 
         /* Reset rx_size to prevent semaphore being set while nothing waits for the data */
         uart_interfaces[uart].rx_size = 0;
       }
@@ -294,8 +382,7 @@ OSStatus MicoUartRecv( mico_uart_t uart, void* data, uint32_t size, uint32_t tim
       {
         uint8_t* available_data;
         uint32_t bytes_available;
-        
-         platform_log("uart receive 03"); 
+         //platform_log("uart receive 03"); 
         ring_buffer_get_data( uart_interfaces[uart].rx_buffer, &available_data, &bytes_available );
         bytes_available = MIN( bytes_available, transfer_size );
         memcpy( data, available_data, bytes_available );
@@ -307,46 +394,47 @@ OSStatus MicoUartRecv( mico_uart_t uart, void* data, uint32_t size, uint32_t tim
     
     if ( size != 0 )
     {
-         platform_log("uart receive 04"); 
       return kGeneralErr;
     }
     else
     {
-         platform_log("uart receive 05"); 
       return kNoErr;
     }
   }
   else
   {
-#endif 
     return platform_uart_receive_bytes( uart, data, size, timeout );
-//  }
+  }
+#else
+    return platform_uart_receive_bytes( uart, data, size, timeout );
+#endif 
  // return kNoErr;
 }
 
 
 static OSStatus platform_uart_receive_bytes( mico_uart_t uart, void* data, uint32_t size, uint32_t timeout )
 {
-
+    uint32_t  Instance = getInstanceBy(uart);
+    uart_status_t retVal = kStatus_UART_Success;
   /* Reset DMA transmission result. The result is assigned in interrupt handler */
-  //  uart_interfaces[uart].rx_dma_result = kGeneralErr;
-   //  if(UART_DRV_EdmaReceiveData(BOARD_DEBUG_UART_INSTANCE, data, size)==kStatus_UART_Success){
-   if(UART_DRV_EdmaReceiveDataBlocking(BOARD_APP_UART_INSTANCE, data,1, timeout)==kStatus_UART_Success){
-         platform_log("uart receive success.");
-#if ADD_OS_CODE
+   uart_interfaces[uart].rx_dma_result = kGeneralErr;
+#ifdef UART_IRQ_APP   
+   retVal = UART_DRV_ReceiveDataBlocking(Instance, data, size, timeout);
+  // if(UART_DRV_ReceiveData(BOARD_APP_UART_INSTANCE, data,size )==kStatus_UART_Success){  
+#else   
+  //  if(UART_DRV_EdmaReceiveData(BOARD_DEBUG_UART_INSTANCE, data, size)==kStatus_UART_Success){
+   retVal = UART_DRV_EdmaReceiveDataBlocking(Instance, data, size, timeout);//
+#endif
+   if(retVal == kStatus_UART_Success) { 
         #ifndef NO_MICO_RTOS
             mico_rtos_set_semaphore( &uart_interfaces[uart].rx_complete );
         #else
             uart_interfaces[uart ].rx_complete = true;
         #endif
-#endif
+  return kNoErr;
     }
-    //if(UART_DRV_EdmaReceiveData(BOARD_DEBUG_UART_INSTANCE, data, size)==kStatus_UART_Success){}
-  
-#if ADD_OS_CODE
   if ( timeout > 0 )
-  {
-         platform_log("uart receive timeout.");
+   {
 #ifndef NO_MICO_RTOS
     mico_rtos_get_semaphore( &uart_interfaces[uart].rx_complete, timeout );
 #else
@@ -360,21 +448,30 @@ static OSStatus platform_uart_receive_bytes( mico_uart_t uart, void* data, uint3
 #endif
     return uart_interfaces[uart].rx_dma_result;
   }   
-#endif
-  return kNoErr;
+  return kGeneralErr;              // kNoErr;
 }
 
 
 uint32_t MicoUartGetLengthInBuffer( mico_uart_t uart )
 {
+#if RING_BUFF_ON
   return ring_buffer_used_space( uart_interfaces[uart].rx_buffer );
+#else
+  uart_state_t * uState = &uartState;
+  uint32_t len = 0;
+   len =  uState->pRxSize;
+   if(len != 0){
+       uState->pRxSize = 0;
+   }
+  return len;
+  // return 0; //test
+#endif
 }
 
 #ifndef NO_MICO_RTOS
 static void thread_wakeup(void *arg)
 {
   mico_uart_t uart = *(mico_uart_t *)arg;
-  
   while(1){
 //     if(mico_rtos_get_semaphore(&uart_interfaces[ uart ].sem_wakeup, 1000) != kNoErr){
 //      gpio_irq_enable(uart_mapping[uart].pin_rx->bank, uart_mapping[uart].pin_rx->number, IRQ_TRIGGER_FALLING_EDGE, RX_PIN_WAKEUP_handler, &uart);

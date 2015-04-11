@@ -33,7 +33,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-//#include "fsl_os_abstraction.h"
+#include "fsl_os_abstraction.h"
 #include "fsl_uart_hal.h"
 
 /*!
@@ -67,10 +67,15 @@ typedef struct UartState {
     volatile bool isRxBusy;        /*!< True if there is an active receive. */
     volatile bool isTxBlocking;    /*!< True if transmit is blocking transaction. */
     volatile bool isRxBlocking;    /*!< True if receive is blocking transaction. */
-    void *  txIrqSync;         /*!< Used to wait for ISR to complete its TX business. */
-    void * rxIrqSync;         /*!< Used to wait for ISR to complete its RX business. */
+    /***********************************************************************************************/
+    //void *  txIrqSync;         /*!< Used to wait for ISR to complete its TX business. */
+    //void * rxIrqSync;         /*!< Used to wait for ISR to complete its RX business. */
+    /*************************************************************************************************/
+    semaphore_t txIrqSync;
+    semaphore_t rxIrqSync;
     uart_rx_callback_t rxCallback; /*!< Callback to invoke after receiving byte.*/
     void * rxCallbackParam;        /*!< Receive callback parameter pointer.*/
+    uint32_t pRxSize;
 } uart_state_t;
 
 /*!
@@ -156,7 +161,8 @@ void UART_DRV_Deinit(uint32_t instance);
 uart_rx_callback_t UART_DRV_InstallRxCallback(uint32_t instance, 
                                               uart_rx_callback_t function, 
                                               void * callbackParam);
-
+/*test Jer*/
+void UART_DRV_CompleteSendData(uint32_t instance);
 /*!
  * @brief Sends (transmits) data out through the UART module using a blocking method.
  *
@@ -222,7 +228,8 @@ uart_status_t UART_DRV_GetTransmitStatus(uint32_t instance, uint32_t * bytesRema
  * @retval kStatus_UART_NoTransmitInProgress No transmission is currently in progress.
  */
 uart_status_t UART_DRV_AbortSendingData(uint32_t instance);
-
+/* test Jer*/
+void UART_DRV_CompleteReceiveData(uint32_t instance);
 /*!
  * @brief Gets (receives) data from the UART module using a blocking method.
  *
